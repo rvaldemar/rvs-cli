@@ -30,7 +30,7 @@ builds:
 
 archives:
   - id: rvs
-    builds: [rvs]
+    ids: [rvs]
     name_template: "rvs_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     files:
