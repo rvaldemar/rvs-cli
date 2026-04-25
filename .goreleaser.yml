@@ -1,0 +1,61 @@
+# GoReleaser config for the rvs CLI.
+# Tagged releases on `cli-v*` produce binaries for linux/darwin × amd64/arm64,
+# uploaded to GitHub Releases as rvs_<os>_<arch>.tar.gz with a checksums.txt.
+
+version: 2
+
+project_name: rvs
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: rvs
+    main: ./
+    binary: rvs
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: rvs
+    builds: [rvs]
+    name_template: "rvs_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    files:
+      - LICENSE*
+      - README*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+release:
+  github:
+    owner: rvaldemar
+    name: rvs-openclaude
+  prerelease: auto
+  name_template: "rvs CLI {{ .Tag }}"
+  draft: false
+
+changelog:
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "Merge pull request"
