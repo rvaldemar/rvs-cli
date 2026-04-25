@@ -1,6 +1,6 @@
 # rvs CLI
 
-Terminal client for the [Agents Hub](https://agents.rvs.solutions).
+Terminal client for the [RVS Agents Hub](https://agents.rvs.solutions).
 
 ```sh
 curl -fsSL https://agents.rvs.solutions/cli/install.sh | sh
@@ -11,7 +11,6 @@ rvs chat
 ## Build from source
 
 ```sh
-cd cli
 go build -o rvs .
 ```
 
@@ -25,7 +24,7 @@ go build -o rvs .
 
 ## Releasing
 
-Tag with `cli-v*` (e.g. `cli-v1.0.0`); GitHub Actions runs GoReleaser to publish:
+Tag with `v*` (e.g. `v1.0.0`); GitHub Actions runs GoReleaser to publish:
 
 - `rvs_linux_amd64.tar.gz`
 - `rvs_linux_arm64.tar.gz`
@@ -33,11 +32,14 @@ Tag with `cli-v*` (e.g. `cli-v1.0.0`); GitHub Actions runs GoReleaser to publish
 - `rvs_darwin_arm64.tar.gz`
 - `checksums.txt`
 
-The web installer (`/cli/install.sh`) downloads from `releases/latest`.
+The web installer at `https://agents.rvs.solutions/cli/install.sh` downloads from `releases/latest`.
 
 ## Tests
 
 ```sh
-cd cli
 go test ./...
 ```
+
+## License
+
+MIT — see LICENSE.

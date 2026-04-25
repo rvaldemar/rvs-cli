@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rvaldemar/rvs-openclaude/cli/cmd"
+	"github.com/rvaldemar/rvs-cli/cmd"
 )
 
 // Set at link time by GoReleaser. See .goreleaser.yml.

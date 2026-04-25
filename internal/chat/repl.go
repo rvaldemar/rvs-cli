@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"text/tabwriter"
 
-	"github.com/rvaldemar/rvs-openclaude/cli/internal/api"
+	"github.com/rvaldemar/rvs-cli/internal/api"
 )
 
 type Session struct {

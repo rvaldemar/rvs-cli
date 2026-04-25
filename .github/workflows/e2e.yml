@@ -1,0 +1,29 @@
+name: E2E
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build E2E image
+        run: docker build -t rvs-e2e -f test/e2e/Dockerfile .
+
+      - name: Run smoke
+        env:
+          RVS_TOKEN: ${{ secrets.RVS_E2E_TOKEN }}
+          RVS_API_BASE: ${{ vars.RVS_E2E_API_BASE || 'https://agents.rvs.solutions' }}
+        run: |
+          if [ -z "${RVS_TOKEN}" ]; then
+            echo "RVS_E2E_TOKEN secret not configured — skipping smoke"
+            exit 0
+          fi
+          docker run --rm \
+            -e RVS_TOKEN \
+            -e RVS_API_BASE \
+            rvs-e2e

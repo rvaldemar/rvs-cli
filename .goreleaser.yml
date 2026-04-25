@@ -1,5 +1,5 @@
 # GoReleaser config for the rvs CLI.
-# Tagged releases on `cli-v*` produce binaries for linux/darwin × amd64/arm64,
+# Tagged releases on `v*` produce binaries for linux/darwin × amd64/arm64,
 # uploaded to GitHub Releases as rvs_<os>_<arch>.tar.gz with a checksums.txt.
 
 version: 2
@@ -47,7 +47,7 @@ snapshot:
 release:
   github:
     owner: rvaldemar
-    name: rvs-openclaude
+    name: rvs-cli
   prerelease: auto
   name_template: "rvs CLI {{ .Tag }}"
   draft: false

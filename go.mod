@@ -1,4 +1,4 @@
-module github.com/rvaldemar/rvs-openclaude/cli
+module github.com/rvaldemar/rvs-cli
 
 go 1.22
 

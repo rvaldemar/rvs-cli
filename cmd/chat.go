@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/rvaldemar/rvs-openclaude/cli/internal/api"
-	"github.com/rvaldemar/rvs-openclaude/cli/internal/chat"
-	"github.com/rvaldemar/rvs-openclaude/cli/internal/config"
+	"github.com/rvaldemar/rvs-cli/internal/api"
+	"github.com/rvaldemar/rvs-cli/internal/chat"
+	"github.com/rvaldemar/rvs-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 

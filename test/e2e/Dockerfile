@@ -2,7 +2,7 @@
 # a token from env, and run a non-interactive command. Used by the
 # cli-e2e workflow on a release; can also be run manually:
 #
-#   docker build -t rvs-e2e -f cli/test/e2e/Dockerfile .
+#   docker build -t rvs-e2e -f test/e2e/Dockerfile .
 #   docker run --rm \
 #     -e RVS_TOKEN=... \
 #     -e RVS_API_BASE=https://agents.rvs.solutions \
@@ -21,5 +21,5 @@ RUN adduser -D -s /bin/bash tester && \
 USER tester
 WORKDIR /home/tester
 
-COPY cli/test/e2e/run.sh /home/tester/run.sh
+COPY test/e2e/run.sh /home/tester/run.sh
 ENTRYPOINT ["bash", "/home/tester/run.sh"]

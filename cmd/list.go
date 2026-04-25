@@ -7,8 +7,8 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/rvaldemar/rvs-openclaude/cli/internal/api"
-	"github.com/rvaldemar/rvs-openclaude/cli/internal/config"
+	"github.com/rvaldemar/rvs-cli/internal/api"
+	"github.com/rvaldemar/rvs-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 
