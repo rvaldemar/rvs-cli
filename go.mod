@@ -1,10 +1,14 @@
 module github.com/rvaldemar/rvs-cli
 
-go 1.22
+go 1.23
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/spf13/cobra v1.8.1
 	golang.org/x/term v0.20.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
