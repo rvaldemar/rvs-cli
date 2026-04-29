@@ -26,6 +26,7 @@ Streaming, attachments, exports, and the same quota as the web app.
 Get started:
   rvs login         issue a CLI token (or paste an existing one)
   rvs chat          interactive REPL with your agents
+  rvs code          run Claude Code through the Hub (requires 'claude' binary)
   rvs version       print the binary version`,
 }
 
@@ -35,6 +36,6 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.AddCommand(loginCmd, logoutCmd, chatCmd, listCmd, versionCmd, meCmd, modelsCmd)
+	rootCmd.AddCommand(loginCmd, logoutCmd, chatCmd, codeCmd, listCmd, versionCmd, meCmd, modelsCmd)
 	rootCmd.PersistentFlags().String("api", "", "override API base URL (default: https://agents.rvs.solutions)")
 }
