@@ -8,6 +8,9 @@ rvs login
 rvs chat              # conversational REPL (HTTP/SSE against the Hub)
 rvs code              # agentic coding with laptop-local tools, brokered by the Hub
 rvs task list         # Hub-issued CoS/agent tasks
+rvs effort log        # log effort entries (time tracking)
+rvs templates list    # list available playbook templates
+rvs templates use     # instantiate a playbook template
 ```
 
 `rvs code` opens a WebSocket against the Hub's `CodeBridgeChannel`, which
@@ -28,6 +31,21 @@ rvs task claim
 rvs task run <task-id>
 ```
 
+## Changelog
+
+### v0.2.0
+
+- `rvs effort log` — log effort entries against tasks with duration and notes
+- `rvs templates list` — list available playbook templates for the org
+- `rvs templates use` — instantiate a playbook template into a live playbook
+- `rvs task create/claim/run` — full CoS task runner (claim lease, exec commands, submit artifact)
+- `rvs code` — gRPC/WebSocket bridge to Hub's `CodeBridgeChannel` with laptop-local tool executors
+- Fix: CLI token scopes correctly set on login (CLI-01)
+
+### v0.1.0
+
+- `rvs login` / `rvs chat` / `rvs list` / `rvs me` / `rvs models` / `rvs version`
+
 ## Build from source
 
 ```sh
@@ -37,7 +55,7 @@ go build -o rvs .
 ## Layout
 
 - `main.go` — version stamping + cobra entrypoint
-- `cmd/` — top-level commands: `login`, `logout`, `chat`, `code`, `task`, `list`, `me`, `models`, `version`
+- `cmd/` — top-level commands: `login`, `logout`, `chat`, `code`, `task`, `list`, `me`, `models`, `version`, `effort`, `templates`
 - `internal/api` — HTTP client (JSON + SSE streaming) used by `rvs chat`
 - `internal/config` — credentials persistence (`~/.config/rvs/credentials`, mode 0600)
 - `internal/chat` — interactive REPL + slash commands
