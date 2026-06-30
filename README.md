@@ -1,9 +1,9 @@
 # rvs CLI
 
-Terminal client for the [RVS Agents Hub](https://agents.rvs.solutions).
+Terminal client for the [RVS Agents Hub](https://hub.rvs.solutions).
 
 ```sh
-curl -fsSL https://agents.rvs.solutions/cli/install.sh | sh
+curl -fsSL https://hub.rvs.solutions/cli/install.sh | sh
 rvs login
 rvs chat              # conversational REPL (HTTP/SSE against the Hub)
 rvs code              # agentic coding with laptop-local tools, brokered by the Hub
@@ -11,7 +11,93 @@ rvs task list         # Hub-issued CoS/agent tasks
 rvs effort log        # log effort entries (time tracking)
 rvs templates list    # list available playbook templates
 rvs templates use     # instantiate a playbook template
+rvs runs list         # list playbook runs for the org
+rvs approvals list    # list pending approval requests
 ```
+
+## Authentication
+
+### Interactive login
+
+```sh
+rvs login
+```
+
+Opens a browser-based OAuth flow and stores the token at
+`~/.config/rvs/credentials` (mode 0600).
+
+### $RVS_TOKEN — non-interactive / CI
+
+Set `RVS_TOKEN` in the environment and `rvs login` is skipped entirely.
+Every command reads the token from the env var first; the stored credentials
+file is only consulted as a fallback.
+
+```sh
+export RVS_TOKEN=rvs_cli_xxxxxxxxxxxx
+rvs chat
+```
+
+To generate a token: **Hub UI → Settings → CLI Tokens**
+(`https://hub.rvs.solutions/settings/cli_tokens`).
+Tokens are scoped per org and per user. Treat them like passwords — do not
+commit them to source control.
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `rvs login` | Authenticate (browser OAuth or `$RVS_TOKEN`) |
+| `rvs logout` | Remove stored credentials |
+| `rvs me` | Print the current authenticated user |
+| `rvs chat` | Interactive chat REPL (HTTP/SSE) |
+| `rvs code` | Agentic coding loop (WebSocket bridge, local tool executors) |
+| `rvs list` | List agent tasks |
+| `rvs task create` | Create a CoS agent task |
+| `rvs task claim` | Claim the next available task |
+| `rvs task run <id>` | Execute a claimed task and submit the artifact |
+| `rvs effort log` | Log effort entries against tasks |
+| `rvs templates list` | List available playbook templates |
+| `rvs templates use` | Instantiate a playbook template into a live playbook |
+| `rvs runs list` | List playbook runs for the org |
+| `rvs approvals list` | List pending approval requests |
+| `rvs models` | List available LLM models |
+| `rvs version` | Print CLI version |
+| `rvs completion` | Generate shell completion scripts |
+
+## Shell completions
+
+Cobra generates completion scripts for bash, zsh, and fish.
+
+### bash
+
+```sh
+rvs completion bash > /etc/bash_completion.d/rvs
+# or for the current user only:
+rvs completion bash > ~/.local/share/bash-completion/completions/rvs
+```
+
+### zsh
+
+```sh
+rvs completion zsh > "${fpath[1]}/_rvs"
+```
+
+If completion is not already enabled in your shell, add this to `~/.zshrc`:
+
+```sh
+autoload -U compinit && compinit
+```
+
+### fish
+
+```sh
+rvs completion fish > ~/.config/fish/completions/rvs.fish
+```
+
+After installing, open a new shell session (or `source` the file) for
+completions to take effect.
+
+---
 
 `rvs code` opens a WebSocket against the Hub's `CodeBridgeChannel`, which
 in turn drives the `rvs-openclaude` sidecar's QueryEngine. The LLM runs on
@@ -73,7 +159,7 @@ Tag with `v*` (e.g. `v1.0.0`); GitHub Actions runs GoReleaser to publish:
 - `rvs_darwin_arm64.tar.gz`
 - `checksums.txt`
 
-The web installer at `https://agents.rvs.solutions/cli/install.sh` downloads from `releases/latest`.
+The web installer at `https://hub.rvs.solutions/cli/install.sh` downloads from `releases/latest`.
 
 ## Tests
 
