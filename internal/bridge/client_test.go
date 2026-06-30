@@ -25,6 +25,13 @@ type fakeCable struct {
 }
 
 func (s *fakeCable) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("cli_token") != "" {
+		s.t.Errorf("cli_token must not be sent in the WebSocket URL")
+	}
+	if got := r.Header.Get("Authorization"); !strings.HasPrefix(got, "Bearer ") {
+		s.t.Errorf("missing bearer Authorization header: %q", got)
+	}
+
 	upgrader := websocket.Upgrader{
 		Subprotocols:    []string{"actioncable-v1-json"},
 		CheckOrigin:     func(*http.Request) bool { return true },

@@ -65,6 +65,64 @@ func TestQuotaErrorOn402(t *testing.T) {
 	}
 }
 
+func TestQuotaErrorOn402WithStructuredUsage(t *testing.T) {
+	_, c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusPaymentRequired)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"scope":    "user",
+			"reset_at": "2026-05-01T00:00:00Z",
+			"usage":    map[string]any{"tokens": 150, "cost_cents": 20},
+			"cap":      map[string]any{"tokens": 100, "cost_cents": 50},
+			"message":  "user cap reached",
+		})
+	})
+
+	_, err := c.ListConversations(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	qe, ok := err.(*QuotaError)
+	if !ok {
+		t.Fatalf("want *QuotaError, got %T: %v", err, err)
+	}
+	if qe.Usage != 150 || qe.Cap != 100 {
+		t.Errorf("unexpected: %+v", qe)
+	}
+}
+
+func TestMeIncludesRuntime(t *testing.T) {
+	_, c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/me" {
+			t.Errorf("path: %s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
+				"user": map[string]any{"id": 1, "email": "a@b", "name": "Alice"},
+				"organization": map[string]any{
+					"id":               2,
+					"name":             "Acme",
+					"ai_tier":          "standard",
+					"tier_config_name": "gpt_codex_subscription",
+					"runtime": map[string]any{
+						"provider":   "openai",
+						"model":      "gpt-4.1-mini",
+						"status":     "configured",
+						"configured": true,
+					},
+				},
+			},
+		})
+	})
+
+	me, err := c.Me(context.Background())
+	if err != nil {
+		t.Fatalf("Me: %v", err)
+	}
+	if me.Data.Organization.Runtime.Provider != "openai" || me.Data.Organization.Runtime.Model != "gpt-4.1-mini" {
+		t.Errorf("unexpected runtime: %+v", me.Data.Organization.Runtime)
+	}
+}
+
 func TestStreamMessageEvents(t *testing.T) {
 	body := strings.Join([]string{
 		"event: start",
@@ -124,5 +182,85 @@ func TestModelsListsData(t *testing.T) {
 	}
 	if len(models) != 1 || models[0].ID != "claude-haiku" {
 		t.Errorf("unexpected: %+v", models)
+	}
+}
+
+func TestAgentTaskCreateClaimSubmit(t *testing.T) {
+	var seen []string
+	_, c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.Path)
+		if auth := r.Header.Get("Authorization"); auth != "Bearer test-token" {
+			t.Errorf("authorization header: %q", auth)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/agent_tasks":
+			if r.Method != http.MethodPost {
+				t.Errorf("method: %s", r.Method)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"id": "t1", "title": "Smoke", "status": "queued"},
+			})
+		case "/api/v1/agent_tasks/claim":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"id": "t1", "title": "Smoke", "status": "running", "claimed_by": "runner-1"},
+			})
+		case "/api/v1/agent_tasks/t1/submit":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{"id": "t1", "title": "Smoke", "status": "submitted"},
+			})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	created, err := c.CreateAgentTask(context.Background(), AgentTaskCreate{
+		Title:     "Smoke",
+		Objective: "Run true",
+		Commands:  []AgentTaskCommand{{Run: "true"}},
+	})
+	if err != nil {
+		t.Fatalf("CreateAgentTask: %v", err)
+	}
+	if created.ID != "t1" || created.Status != "queued" {
+		t.Fatalf("created: %+v", created)
+	}
+
+	claimed, err := c.ClaimAgentTask(context.Background(), AgentTaskClaim{RunnerID: "runner-1"})
+	if err != nil {
+		t.Fatalf("ClaimAgentTask: %v", err)
+	}
+	if claimed.ClaimedBy != "runner-1" {
+		t.Fatalf("claimed: %+v", claimed)
+	}
+
+	submitted, err := c.SubmitAgentTask(context.Background(), "t1", "runner-1", "green", map[string]any{"status": "passed"})
+	if err != nil {
+		t.Fatalf("SubmitAgentTask: %v", err)
+	}
+	if submitted.Status != "submitted" {
+		t.Fatalf("submitted: %+v", submitted)
+	}
+
+	want := []string{"POST /api/v1/agent_tasks", "POST /api/v1/agent_tasks/claim", "POST /api/v1/agent_tasks/t1/submit"}
+	if strings.Join(seen, ",") != strings.Join(want, ",") {
+		t.Fatalf("seen %v want %v", seen, want)
+	}
+}
+
+func TestClaimAgentTaskEmptyQueue(t *testing.T) {
+	_, c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/agent_tasks/claim" {
+			t.Fatalf("path: %s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": nil})
+	})
+
+	task, err := c.ClaimAgentTask(context.Background(), AgentTaskClaim{RunnerID: "runner-1"})
+	if err != nil {
+		t.Fatalf("ClaimAgentTask: %v", err)
+	}
+	if task != nil {
+		t.Fatalf("expected nil task, got %+v", task)
 	}
 }

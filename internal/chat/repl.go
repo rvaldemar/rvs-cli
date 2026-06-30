@@ -107,10 +107,15 @@ func (s *Session) sendMessage(ctx context.Context, content string) error {
 		switch ev.Type {
 		case "chunk":
 			var payload struct {
-				Delta string `json:"delta"`
+				Delta   string `json:"delta"`
+				Content string `json:"content"`
 			}
 			if err := json.Unmarshal(ev.Data, &payload); err == nil {
-				fmt.Fprint(s.Stdout, payload.Delta)
+				if payload.Delta != "" {
+					fmt.Fprint(s.Stdout, payload.Delta)
+				} else {
+					fmt.Fprint(s.Stdout, payload.Content)
+				}
 			}
 		case "done":
 			fmt.Fprintln(s.Stdout)
@@ -211,8 +216,24 @@ func (s *Session) handleCommand(ctx context.Context, line string) (bool, error) 
 		if err != nil {
 			return false, err
 		}
-		fmt.Fprintf(s.Stdout, "Tier: %s — used %.1f%% of %d cents.\n",
-			q.Data.AITier, q.Data.BudgetUsedPct, q.Data.MonthlyBudgetCents)
+		if q.Data.Runtime.Provider != "" {
+			fmt.Fprintf(s.Stdout, "Runtime: %s / %s (%s)\n",
+				q.Data.Runtime.Provider, q.Data.Runtime.Model, q.Data.Runtime.Status)
+		}
+		if q.Data.MonthlyTokenCap > 0 || q.Data.MonthlyCostCapCents > 0 {
+			tier := q.Data.TierConfigName
+			if tier == "" {
+				tier = "unconfigured"
+			}
+			fmt.Fprintf(s.Stdout, "Tier: %s / %s — %d/%d tokens, %d/%d cents (%.1f%%).\n",
+				q.Data.AITier, tier,
+				q.Data.CurrentMonthTokens, q.Data.MonthlyTokenCap,
+				q.Data.CurrentMonthCostCents, q.Data.MonthlyCostCapCents,
+				q.Data.QuotaUsedPct)
+		} else {
+			fmt.Fprintf(s.Stdout, "Tier: %s — used %.1f%% of %d cents.\n",
+				q.Data.AITier, q.Data.BudgetUsedPct, q.Data.MonthlyBudgetCents)
+		}
 	case "/model":
 		models, err := s.Client.Models(ctx)
 		if err != nil {

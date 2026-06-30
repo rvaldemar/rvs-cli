@@ -5,30 +5,30 @@
 // The Hub speaks Rails 8 ActionCable on /cable. After upgrade, frames are
 // JSON envelopes following the documented ActionCable wire protocol:
 //
-//   server → client:
-//     {"type":"welcome"}
-//     {"type":"ping","message":<unix-ts>}
-//     {"type":"confirm_subscription","identifier":"<id-json>"}
-//     {"type":"reject_subscription","identifier":"<id-json>"}
-//     {"identifier":"<id-json>","message":<channel-payload>}
-//     {"type":"disconnect","reason":"..."}
+//	server → client:
+//	  {"type":"welcome"}
+//	  {"type":"ping","message":<unix-ts>}
+//	  {"type":"confirm_subscription","identifier":"<id-json>"}
+//	  {"type":"reject_subscription","identifier":"<id-json>"}
+//	  {"identifier":"<id-json>","message":<channel-payload>}
+//	  {"type":"disconnect","reason":"..."}
 //
-//   client → server:
-//     {"command":"subscribe","identifier":"<id-json>"}
-//     {"command":"message","identifier":"<id-json>","data":"<json-string>"}
-//     {"command":"unsubscribe","identifier":"<id-json>"}
+//	client → server:
+//	  {"command":"subscribe","identifier":"<id-json>"}
+//	  {"command":"message","identifier":"<id-json>","data":"<json-string>"}
+//	  {"command":"unsubscribe","identifier":"<id-json>"}
 //
 // `identifier` is a JSON-encoded string (channel descriptor).
 //
 // On top of that, CodeBridgeChannel emits three message shapes:
 //
-//   {"ready":   {"session_id":"<uuid>"}}
-//   {"payload": {<proto3-JSON of openclaude.ServerMessage>}}
-//   {"error":   {"type":"<code>","message":"...", ...extras}}
+//	{"ready":   {"session_id":"<uuid>"}}
+//	{"payload": {<proto3-JSON of openclaude.ServerMessage>}}
+//	{"error":   {"type":"<code>","message":"...", ...extras}}
 //
 // And accepts one outbound action:
 //
-//   {"action":"forward","payload":{<proto3-JSON of openclaude.ClientMessage>}}
+//	{"action":"forward","payload":{<proto3-JSON of openclaude.ClientMessage>}}
 package bridge
 
 import (
@@ -129,9 +129,9 @@ func New(apiBase, token string) *Client {
 // and waits for the `ready` envelope. Returns when the channel is ready to
 // accept Send calls. The reader loop is started before Connect returns.
 //
-// Authentication: the CliToken is sent as a `cli_token` query parameter on
-// the upgrade URL (the Hub also accepts `Authorization: Bearer <token>`,
-// which we add as a backup for proxies that strip query strings).
+// Authentication: the CliToken is sent only in the Authorization header. The
+// token must never be placed in the WebSocket URL because URLs are routinely
+// logged by proxies, Rails, and diagnostics.
 func (c *Client) Connect(ctx context.Context) error {
 	u, err := c.cableURL()
 	if err != nil {
@@ -201,9 +201,6 @@ func (c *Client) cableURL() (*url.URL, error) {
 	default:
 		return nil, fmt.Errorf("unsupported scheme %q on cable url", u.Scheme)
 	}
-	q := u.Query()
-	q.Set("cli_token", c.token)
-	u.RawQuery = q.Encode()
 	return u, nil
 }
 

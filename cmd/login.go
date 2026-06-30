@@ -88,7 +88,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 
 	email := first
 	fmt.Print("Password: ")
-	password, err := readPassword()
+	password, err := readPassword(reader)
 	if err != nil {
 		return err
 	}
@@ -137,11 +137,11 @@ func looksLikeToken(s string) bool {
 	return len(s) >= 24
 }
 
-func readPassword() (string, error) {
+func readPassword(reader *bufio.Reader) (string, error) {
 	fd := int(os.Stdin.Fd())
 	if !term.IsTerminal(fd) {
 		// Fallback: read from stdin in plain text (CI/tests).
-		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		line, err := reader.ReadString('\n')
 		return strings.TrimSpace(line), err
 	}
 	pw, err := term.ReadPassword(fd)
