@@ -26,7 +26,7 @@ Streaming, attachments, exports, and the same quota as the web app.
 Get started:
   rvs login         issue a CLI token (or paste an existing one)
   rvs chat          interactive REPL with your agents
-  rvs code          run Claude Code through the Hub (requires 'claude' binary)
+  rvs code          agentic coding loop (laptop tools + Hub-hosted LLM)
   rvs version       print the binary version`,
 }
 

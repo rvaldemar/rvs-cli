@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package openclaude.v1;
+
+// rvs-cli local copy. The canonical proto lives in
+// rvs-openclaude/upstream/src/proto/openclaude.proto. Copied here so this
+// repo can regenerate Go message stubs without a checkout of the sidecar.
+// Run `make proto` to regenerate after the upstream proto changes.
+option go_package = "github.com/rvaldemar/rvs-cli/internal/openclaude/v1;openclaudev1";
+
+// Main Agent Service
+service AgentService {
+  // Bidirectional stream: client sends tasks and answers to agent prompts,
+  // server streams text tokens, tool states, and requests permissions.
+  rpc Chat(stream ClientMessage) returns (stream ServerMessage);
+}
+
+// ---------------------------------------------------------
+// MESSAGES FROM CLIENT (Input)
+// ---------------------------------------------------------
+message ClientMessage {
+  oneof payload {
+    // 1. Initial request (first message in the stream)
+    ChatRequest request = 2;
+
+    // 2. User response to an agent prompt (e.g., command confirmation)
+    UserInput input = 3;
+
+    // 3. Interrupt signal (if the user clicks "Stop generation")
+    CancelSignal cancel = 4;
+
+    // 4. Response to a tool execution request from the server
+    ToolExecuteResponse tool_response = 5;
+  }
+}
+
+message ChatRequest {
+  string message = 1;
+  string working_directory = 2; // Where the agent should execute commands
+  reserved 3;                   // Reserved to prevent accidental reuse
+  optional string model = 4;
+  string session_id = 5;        // Non-empty = cross-stream session persistence
+
+  // --- Hub integration extensions ---
+  optional string system_prompt = 6;        // Full system prompt (overrides default)
+  optional string append_system_prompt = 7; // Appended to system prompt
+  repeated ToolDefinition tools = 8;        // External tools (executed by client via callback)
+  optional string output_schema_json = 9;   // JSON Schema for structured output
+  optional int32 max_tokens = 10;           // Max response tokens
+  optional float temperature = 11;          // Temperature override
+  optional int32 max_turns = 12;            // Max agentic iterations
+  optional string org_id = 13;             // Multi-tenancy: org scoping for sessions
+
+  // Built-in tools to suppress for this request. Lets the Hub delegate
+  // file-system tools (Read/Edit/Write/Bash/Glob/Grep/WebFetch) to the
+  // calling client (e.g. rvs-cli on the user's laptop) without colliding
+  // with the same-named tools the sidecar would otherwise expose. The Hub
+  // re-introduces them as external ToolDefinition entries in `tools` above,
+  // so execution happens at the client via the tool_execute callback.
+  repeated string disabled_builtin_tools = 14;
+}
+
+// External tool definition provided by the client (e.g., API connections)
+message ToolDefinition {
+  string name = 1;
+  string description = 2;
+  string input_schema_json = 3;  // JSON Schema as string
+}
+
+message UserInput {
+  string reply = 1;       // Text response (e.g., "y", "no", or clarification)
+  string prompt_id = 2;   // ID of the prompt we are responding to
+}
+
+message CancelSignal {
+  string reason = 1;
+}
+
+// Client's response to a ToolExecuteRequest from the server
+message ToolExecuteResponse {
+  string request_id = 1;    // Must match ToolExecuteRequest.request_id
+  string result_json = 2;   // Tool execution result as JSON
+  bool is_error = 3;        // Whether the tool execution failed
+}
+
+// ---------------------------------------------------------
+// MESSAGES FROM SERVER (Output / Events)
+// ---------------------------------------------------------
+message ServerMessage {
+  // Using oneof guarantees that only one type of event arrives at a time
+  oneof event {
+    TextChunk text_chunk = 1;          // Chunk of text from LLM
+    ToolCallStart tool_start = 2;      // Agent started using a tool
+    ToolCallResult tool_result = 3;    // Tool returned a result
+    ActionRequired action_required = 4;// Agent requires human intervention
+    FinalResponse done = 5;            // Generation successfully completed
+    ErrorResponse error = 6;           // A critical error occurred
+    ToolExecuteRequest tool_execute = 7; // Server requests client to execute an external tool
+  }
+}
+
+// Stream text chunk
+message TextChunk {
+  string text = 1;
+}
+
+// Agent decided to use a tool (bash, read_file, etc.)
+message ToolCallStart {
+  string tool_name = 1;
+  string arguments_json = 2; // Arguments in JSON format
+  string tool_use_id = 3;    // Correlation ID matching ToolCallResult
+}
+
+// Result of tool execution
+message ToolCallResult {
+  string tool_name = 1;
+  string output = 2;      // stdout/stderr or file contents
+  bool is_error = 3;      // Did the command itself fail
+  string tool_use_id = 4; // Correlation ID matching ToolCallStart
+}
+
+// Agent paused work and is waiting for user decision
+message ActionRequired {
+  string prompt_id = 1;        // Client must return this ID in UserInput
+  string question = 2;         // Question text (e.g., "Execute 'rm -rf /'?")
+  enum ActionType {
+    CONFIRM_COMMAND = 0;       // Yes/No
+    REQUEST_INFORMATION = 1;   // Text input
+  }
+  ActionType type = 3;
+}
+
+// Server requests the client to execute an external tool (Hub connection)
+// The client must respond with ToolExecuteResponse carrying the same request_id
+message ToolExecuteRequest {
+  string tool_name = 1;
+  string arguments_json = 2;  // Arguments as JSON
+  string request_id = 3;      // Correlation ID for matching response
+}
+
+// Final statistics
+message FinalResponse {
+  string full_text = 1;     // The entire generated text
+  int32 prompt_tokens = 2;
+  int32 completion_tokens = 3;
+}
+
+message ErrorResponse {
+  string message = 1;
+  string code = 2;
+}

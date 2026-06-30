@@ -5,14 +5,28 @@ Terminal client for the [RVS Agents Hub](https://agents.rvs.solutions).
 ```sh
 curl -fsSL https://agents.rvs.solutions/cli/install.sh | sh
 rvs login
-rvs chat              # conversational REPL
-rvs code              # Anthropic Claude Code, routed through the Hub
+rvs chat              # conversational REPL (HTTP/SSE against the Hub)
+rvs code              # agentic coding with laptop-local tools, brokered by the Hub
+rvs task list         # Hub-issued CoS/agent tasks
 ```
 
-`rvs code` requires the `claude` binary on PATH
-(`npm install -g @anthropic-ai/claude-code`). It runs Claude Code with
-`ANTHROPIC_BASE_URL` pointing at the Hub's passthrough, so all calls go
-through the org's quota and budget tracking.
+`rvs code` opens a WebSocket against the Hub's `CodeBridgeChannel`, which
+in turn drives the `rvs-openclaude` sidecar's QueryEngine. The LLM runs on
+the Hub side; file-system tools (`Read`, `Write`, `Edit`, `Bash`, `Glob`,
+`Grep`, `WebFetch`) execute locally on the laptop with TTY permission
+prompts. Calls are gated and metered against the org's plan and per-user
+quota. No `claude` binary required.
+
+`rvs task` is the local runner surface for CoS-style work. The Hub owns the
+`AgentTask` contract, lease and artifact; the CLI claims a task, executes only
+the commands declared on that task, renews the lease, and submits the artifact
+back to the Hub.
+
+```sh
+rvs task create --title "Smoke" --objective "Run a local smoke" --repo "$PWD" --cmd "true"
+rvs task claim
+rvs task run <task-id>
+```
 
 ## Build from source
 
@@ -23,10 +37,13 @@ go build -o rvs .
 ## Layout
 
 - `main.go` — version stamping + cobra entrypoint
-- `cmd/` — top-level commands: `login`, `logout`, `chat`, `code`, `list`, `me`, `models`, `version`
-- `internal/api` — HTTP client (JSON + SSE streaming)
+- `cmd/` — top-level commands: `login`, `logout`, `chat`, `code`, `task`, `list`, `me`, `models`, `version`
+- `internal/api` — HTTP client (JSON + SSE streaming) used by `rvs chat`
 - `internal/config` — credentials persistence (`~/.config/rvs/credentials`, mode 0600)
 - `internal/chat` — interactive REPL + slash commands
+- `internal/bridge` — WebSocket subscriber for the Hub's `CodeBridgeChannel`
+- `internal/tools` — local tool executors with TTY permission gate (Read/Write/Edit/Bash/Glob/Grep/WebFetch)
+- `internal/openclaude/v1` + `proto/` — proto3 message definitions used over the bridge
 
 ## Releasing
 

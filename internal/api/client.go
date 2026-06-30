@@ -58,6 +58,56 @@ func (e *QuotaError) Error() string {
 	return fmt.Sprintf("quota exceeded (%s, resets %s): %d/%d", e.Scope, e.ResetAt, e.Usage, e.Cap)
 }
 
+func (e *QuotaError) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Scope   string          `json:"scope"`
+		ResetAt string          `json:"reset_at"`
+		Usage   json.RawMessage `json:"usage"`
+		Cap     json.RawMessage `json:"cap"`
+		Message string          `json:"message"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	e.Scope = raw.Scope
+	e.ResetAt = raw.ResetAt
+	e.Message = raw.Message
+
+	var err error
+	if len(raw.Usage) > 0 {
+		e.Usage, err = quotaAmount(raw.Usage)
+		if err != nil {
+			return fmt.Errorf("quota usage: %w", err)
+		}
+	}
+	if len(raw.Cap) > 0 {
+		e.Cap, err = quotaAmount(raw.Cap)
+		if err != nil {
+			return fmt.Errorf("quota cap: %w", err)
+		}
+	}
+	return nil
+}
+
+func quotaAmount(data []byte) (int64, error) {
+	var scalar int64
+	if err := json.Unmarshal(data, &scalar); err == nil {
+		return scalar, nil
+	}
+
+	var obj struct {
+		Tokens    int64 `json:"tokens"`
+		CostCents int64 `json:"cost_cents"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return 0, err
+	}
+	if obj.Tokens != 0 {
+		return obj.Tokens, nil
+	}
+	return obj.CostCents, nil
+}
+
 func (c *Client) do(ctx context.Context, method, path string, body any) (*http.Response, error) {
 	var rdr io.Reader
 	if body != nil {
@@ -139,15 +189,40 @@ func (c *Client) Login(ctx context.Context, email, password, label string) (*Log
 // === Identity ===
 
 type MeUser struct {
-	ID    string `json:"id"`
+	ID    ID     `json:"id"`
 	Email string `json:"email"`
 	Name  string `json:"name"`
 }
 
 type MeOrg struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	AITier string `json:"ai_tier"`
+	ID             ID      `json:"id"`
+	Name           string  `json:"name"`
+	AITier         string  `json:"ai_tier"`
+	TierConfigName string  `json:"tier_config_name"`
+	Runtime        Runtime `json:"runtime"`
+}
+
+type ID string
+
+func (id *ID) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*id = ""
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*id = ID(s)
+		return nil
+	}
+	*id = ID(string(data))
+	return nil
+}
+
+type Runtime struct {
+	Provider   string `json:"provider"`
+	Model      string `json:"model"`
+	Status     string `json:"status"`
+	Configured bool   `json:"configured"`
 }
 
 type Me struct {
@@ -171,13 +246,21 @@ func (c *Client) Me(ctx context.Context) (*Me, error) {
 
 type Quota struct {
 	Data struct {
-		AITier              string  `json:"ai_tier"`
-		MonthlyBudgetCents  int64   `json:"monthly_budget_cents"`
-		CurrentMonthSpend   int64   `json:"current_month_spend_cents"`
-		BudgetUsedPct       float64 `json:"budget_used_pct"`
-		EnforcementAction   string  `json:"enforcement_action"`
-		OverBudget          bool    `json:"over_budget"`
-		PeriodStart         string  `json:"period_start"`
+		AITier                string  `json:"ai_tier"`
+		TierConfigName        string  `json:"tier_config_name"`
+		QuotaScope            string  `json:"quota_scope"`
+		MonthlyTokenCap       int64   `json:"monthly_token_cap"`
+		MonthlyCostCapCents   int64   `json:"monthly_cost_cap_cents"`
+		CurrentMonthTokens    int64   `json:"current_month_tokens"`
+		CurrentMonthCostCents int64   `json:"current_month_cost_cents"`
+		QuotaUsedPct          float64 `json:"quota_used_pct"`
+		MonthlyBudgetCents    int64   `json:"monthly_budget_cents"`
+		CurrentMonthSpend     int64   `json:"current_month_spend_cents"`
+		BudgetUsedPct         float64 `json:"budget_used_pct"`
+		EnforcementAction     string  `json:"enforcement_action"`
+		OverBudget            bool    `json:"over_budget"`
+		PeriodStart           string  `json:"period_start"`
+		Runtime               Runtime `json:"runtime"`
 	} `json:"data"`
 }
 
@@ -204,7 +287,8 @@ type ModelInfo struct {
 }
 
 type modelsResp struct {
-	Data []ModelInfo `json:"data"`
+	Data    []ModelInfo `json:"data"`
+	Runtime Runtime     `json:"runtime"`
 }
 
 func (c *Client) Models(ctx context.Context) ([]ModelInfo, error) {
@@ -217,6 +301,279 @@ func (c *Client) Models(ctx context.Context) ([]ModelInfo, error) {
 		return nil, err
 	}
 	return out.Data, nil
+}
+
+// === Agent tasks ===
+
+type AgentTaskCommand struct {
+	Name string `json:"name,omitempty"`
+	Run  string `json:"run"`
+}
+
+type AgentTask struct {
+	ID             string             `json:"id"`
+	Title          string             `json:"title"`
+	Objective      string             `json:"objective"`
+	Status         string             `json:"status"`
+	Priority       string             `json:"priority"`
+	RepoPath       string             `json:"repo_path"`
+	BaseBranch     string             `json:"base_branch"`
+	BranchName     string             `json:"branch_name"`
+	OwnerAgent     string             `json:"owner_agent"`
+	ModelLane      string             `json:"model_lane"`
+	Scope          map[string]any     `json:"scope"`
+	Acceptance     []string           `json:"acceptance"`
+	Commands       []AgentTaskCommand `json:"commands"`
+	Constraints    map[string]any     `json:"constraints"`
+	Artifact       map[string]any     `json:"artifact"`
+	Metadata       map[string]any     `json:"metadata"`
+	ClaimedBy      string             `json:"claimed_by"`
+	ClaimedAt      string             `json:"claimed_at"`
+	HeartbeatAt    string             `json:"heartbeat_at"`
+	LeaseExpiresAt string             `json:"lease_expires_at"`
+	SubmittedAt    string             `json:"submitted_at"`
+	FailureReason  string             `json:"failure_reason"`
+	CreatedAt      string             `json:"created_at"`
+	UpdatedAt      string             `json:"updated_at"`
+}
+
+type AgentTaskCreate struct {
+	Title       string             `json:"title"`
+	Objective   string             `json:"objective"`
+	Priority    string             `json:"priority,omitempty"`
+	RepoPath    string             `json:"repo_path,omitempty"`
+	BaseBranch  string             `json:"base_branch,omitempty"`
+	BranchName  string             `json:"branch_name,omitempty"`
+	OwnerAgent  string             `json:"owner_agent,omitempty"`
+	ModelLane   string             `json:"model_lane,omitempty"`
+	Scope       map[string]any     `json:"scope,omitempty"`
+	Acceptance  []string           `json:"acceptance,omitempty"`
+	Commands    []AgentTaskCommand `json:"commands,omitempty"`
+	Constraints map[string]any     `json:"constraints,omitempty"`
+	Metadata    map[string]any     `json:"metadata,omitempty"`
+}
+
+type AgentTaskClaim struct {
+	RunnerID     string `json:"runner_id,omitempty"`
+	RepoPath     string `json:"repo_path,omitempty"`
+	OwnerAgent   string `json:"owner_agent,omitempty"`
+	LeaseSeconds int    `json:"lease_seconds,omitempty"`
+}
+
+type agentTasksResp struct {
+	Data []AgentTask `json:"data"`
+}
+
+type agentTaskResp struct {
+	Data *AgentTask `json:"data"`
+}
+
+func (c *Client) ListAgentTasks(ctx context.Context) ([]AgentTask, error) {
+	resp, err := c.do(ctx, "GET", "/api/v1/agent_tasks", nil)
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTasksResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) GetAgentTask(ctx context.Context, id string) (*AgentTask, error) {
+	resp, err := c.do(ctx, "GET", "/api/v1/agent_tasks/"+id, nil)
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTaskResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) CreateAgentTask(ctx context.Context, input AgentTaskCreate) (*AgentTask, error) {
+	resp, err := c.do(ctx, "POST", "/api/v1/agent_tasks", map[string]any{
+		"agent_task": input,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTaskResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) ClaimAgentTask(ctx context.Context, input AgentTaskClaim) (*AgentTask, error) {
+	resp, err := c.do(ctx, "POST", "/api/v1/agent_tasks/claim", input)
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTaskResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) ClaimAgentTaskByID(ctx context.Context, id string, input AgentTaskClaim) (*AgentTask, error) {
+	resp, err := c.do(ctx, "POST", "/api/v1/agent_tasks/"+id+"/claim", input)
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTaskResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) HeartbeatAgentTask(ctx context.Context, id, runnerID string, leaseSeconds int) (*AgentTask, error) {
+	resp, err := c.do(ctx, "POST", "/api/v1/agent_tasks/"+id+"/heartbeat", map[string]any{
+		"runner_id":     runnerID,
+		"lease_seconds": leaseSeconds,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTaskResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) SubmitAgentTask(ctx context.Context, id, runnerID, summary string, artifact map[string]any) (*AgentTask, error) {
+	resp, err := c.do(ctx, "POST", "/api/v1/agent_tasks/"+id+"/submit", map[string]any{
+		"runner_id": runnerID,
+		"summary":   summary,
+		"artifact":  artifact,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTaskResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) FailAgentTask(ctx context.Context, id, runnerID, reason string, blocked bool, artifact map[string]any) (*AgentTask, error) {
+	resp, err := c.do(ctx, "POST", "/api/v1/agent_tasks/"+id+"/fail", map[string]any{
+		"runner_id": runnerID,
+		"reason":    reason,
+		"blocked":   blocked,
+		"artifact":  artifact,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTaskResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) CancelAgentTask(ctx context.Context, id string) (*AgentTask, error) {
+	resp, err := c.do(ctx, "POST", "/api/v1/agent_tasks/"+id+"/cancel", nil)
+	if err != nil {
+		return nil, err
+	}
+	out := &agentTaskResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+// === Effort entries ===
+
+type EffortEntry struct {
+	ID        string `json:"id"`
+	Minutes   int    `json:"minutes"`
+	Category  string `json:"category"`
+	Note      string `json:"note"`
+	CreatedAt string `json:"created_at"`
+}
+
+func (c *Client) LogEffortEntry(ctx context.Context, minutes int, category, note string) (*EffortEntry, error) {
+	body := map[string]any{
+		"effort_entry": map[string]any{
+			"minutes":  minutes,
+			"category": category,
+			"note":     note,
+		},
+	}
+	resp, err := c.do(ctx, "POST", "/api/v1/effort_entries", body)
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Data EffortEntry `json:"data"`
+	}
+	if err := c.decode(resp, &out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+// === Playbook templates ===
+
+type PlaybookTemplate struct {
+	ID        string `json:"id"`
+	Code      string `json:"code"`
+	Domain    string `json:"domain"`
+	Name      string `json:"name"`
+	Version   string `json:"version"`
+	Certified bool   `json:"certified"`
+	CreatedAt string `json:"created_at"`
+}
+
+type PlaybookInstance struct {
+	ID         string `json:"id"`
+	Code       string `json:"code"`
+	TemplateID string `json:"template_id"`
+	CreatedAt  string `json:"created_at"`
+}
+
+func (c *Client) ListPlaybookTemplates(ctx context.Context, domain string) ([]PlaybookTemplate, error) {
+	path := "/api/v1/playbook_templates"
+	if domain != "" {
+		path += "?domain=" + domain
+	}
+	resp, err := c.do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Data []PlaybookTemplate `json:"data"`
+	}
+	if err := c.decode(resp, &out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) InstantiatePlaybookTemplate(ctx context.Context, id, code string) (*PlaybookInstance, error) {
+	body := map[string]any{}
+	if code != "" {
+		body["playbook"] = map[string]string{"code": code}
+	}
+	resp, err := c.do(ctx, "POST", "/api/v1/playbook_templates/"+id+"/instantiate", body)
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Data PlaybookInstance `json:"data"`
+	}
+	if err := c.decode(resp, &out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
 }
 
 // === Conversations ===
