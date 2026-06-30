@@ -500,6 +500,19 @@ type EffortEntry struct {
 	CreatedAt string `json:"created_at"`
 }
 
+// EffortSummary is the aggregated thesis-status payload from
+// GET /api/v1/effort_entries/summary.
+type EffortSummary struct {
+	AtRisk             bool    `json:"at_risk"`
+	LastMilePct        float64 `json:"last_mile_pct"`
+	FirstHalfMinutes   float64 `json:"first_half_minutes"`
+	SecondHalfMinutes  float64 `json:"second_half_minutes"`
+	TotalEntries       int     `json:"total_entries"`
+	MeasuredEntries    int     `json:"measured_entries"`
+	WindowDays         int     `json:"window_days"`
+	EvaluatedAt        string  `json:"evaluated_at"`
+}
+
 func (c *Client) LogEffortEntry(ctx context.Context, minutes int, category, note string) (*EffortEntry, error) {
 	body := map[string]any{
 		"effort_entry": map[string]any{
@@ -514,6 +527,26 @@ func (c *Client) LogEffortEntry(ctx context.Context, minutes int, category, note
 	}
 	var out struct {
 		Data EffortEntry `json:"data"`
+	}
+	if err := c.decode(resp, &out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+// GetEffortSummary calls GET /api/v1/effort_entries/summary and returns the
+// aggregated thesis-status payload. windowDays 0 uses the Hub default (14).
+func (c *Client) GetEffortSummary(ctx context.Context, windowDays int) (*EffortSummary, error) {
+	path := "/api/v1/effort_entries/summary"
+	if windowDays > 0 {
+		path += fmt.Sprintf("?window_days=%d", windowDays)
+	}
+	resp, err := c.do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Data EffortSummary `json:"data"`
 	}
 	if err := c.decode(resp, &out); err != nil {
 		return nil, err
