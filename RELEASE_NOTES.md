@@ -1,5 +1,11 @@
 # rvs CLI — Release Notes
 
+## v0.3.4 (local release prep)
+
+Fixed
+- Made `--json` available on `rvs config` root so `rvs config --json` now prints
+  machine-readable configuration output directly.
+
 ## v0.3.3 (local release prep)
 
 Added
