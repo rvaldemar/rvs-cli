@@ -349,3 +349,99 @@ func TestPlaybookRunsListShowCancel(t *testing.T) {
 		t.Fatalf("seen %v want %v", seen, want)
 	}
 }
+
+func TestApprovalsListShowDecide(t *testing.T) {
+	var seen []string
+	_, c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.RequestURI())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/approvals":
+			if got := r.URL.Query().Get("status"); got != "pending" {
+				t.Errorf("status query: got %q", got)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{{
+					"id":              "ap-1",
+					"playbook_run_id": "run-1",
+					"step_id":         "human-review",
+					"status":          "pending",
+				}},
+			})
+		case "/api/v1/approvals/ap-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
+					"id":              "ap-1",
+					"playbook_run_id": "run-1",
+					"step_id":         "human-review",
+					"status":          "pending",
+					"requested_via":   "whatsapp",
+					"requested_at":    "2026-07-01T10:00:00Z",
+					"context":         map[string]any{"step": "human-review"},
+				},
+			})
+		case "/api/v1/approvals/ap-1/decide":
+			var got map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if got["decision"] != "approved" {
+				t.Errorf("decision: got %v", got["decision"])
+			}
+			if got["decision_note"] != "go" {
+				t.Errorf("decision_note: %v", got["decision_note"])
+			}
+			if got["effort_minutes"] != float64(4) {
+				t.Errorf("effort_minutes: %v", got["effort_minutes"])
+			}
+			if got["decided_by"] != "maria" {
+				t.Errorf("decided_by: %v", got["decided_by"])
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
+					"id":              "ap-1",
+					"playbook_run_id": "run-1",
+					"step_id":         "human-review",
+					"status":          "approved",
+					"decided_by":      "maria",
+				},
+			})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	approvals, err := c.ListApprovals(context.Background(), api.ApprovalFilter{Status: "pending"})
+	if err != nil {
+		t.Fatalf("ListApprovals: %v", err)
+	}
+	if len(approvals) != 1 || approvals[0].ID != "ap-1" || approvals[0].Status != "pending" {
+		t.Fatalf("approvals: %+v", approvals)
+	}
+
+	approval, err := c.GetApproval(context.Background(), "ap-1")
+	if err != nil {
+		t.Fatalf("GetApproval: %v", err)
+	}
+	if approval.Status != "pending" || approval.PlaybookRunID != "run-1" {
+		t.Fatalf("approval: %+v", approval)
+	}
+
+	effortMinutes := 4
+	decided, err := c.DecideApproval(context.Background(), "ap-1", "approved", "maria", "go", &effortMinutes)
+	if err != nil {
+		t.Fatalf("DecideApproval: %v", err)
+	}
+	if decided.Status != "approved" || decided.DecidedBy != "maria" {
+		t.Fatalf("decided approval: %+v", decided)
+	}
+
+	want := []string{
+		"GET /api/v1/approvals?status=pending",
+		"GET /api/v1/approvals/ap-1",
+		"POST /api/v1/approvals/ap-1/decide",
+	}
+	if strings.Join(seen, ",") != strings.Join(want, ",") {
+		t.Fatalf("seen %v want %v", seen, want)
+	}
+}

@@ -12,7 +12,9 @@ rvs task list         # Hub-issued CoS/agent tasks
 rvs effort log        # log effort entries (time tracking)
 rvs templates list    # list available playbook templates
 rvs templates use     # instantiate a playbook template
+rvs approvals list    # inspect pending or historical HITL approvals
 rvs runs list         # list playbook runs for the org
+rvs runs watch <id>    # watch one run to terminal
 ```
 
 ## Authentication
@@ -77,9 +79,13 @@ The command always redacts the token value.
 | `rvs effort log` | Log effort entries against tasks |
 | `rvs templates list` | List available playbook templates |
 | `rvs templates use` | Instantiate a playbook template into a live playbook |
+| `rvs approvals list` | List approvals (`--status` supports pending/approved/rejected/expired) |
+| `rvs approvals show <id>` | Show one approval detail |
+| `rvs approvals decide <id> [approve|reject]` | Decide an approval and resume the playbook run |
 | `rvs runs list` | List playbook runs for the org; supports `--status`, `--from`, `--to`, `--json` |
 | `rvs runs show <id>` | Inspect one playbook run with step results |
 | `rvs runs cancel <id>` | Cancel a running or waiting playbook run |
+| `rvs runs watch <id>` | Watch a run until done/failed/cancelled |
 | `rvs models` | List available LLM models |
 | `rvs version` | Print CLI version |
 | `rvs completion` | Generate shell completion scripts |
@@ -141,6 +147,7 @@ rvs task run <task-id>
 
 ### v0.2.0
 
+- `rvs approvals list/show/decide` — HITL approval visibility and decision workflow from terminal
 - `rvs effort log` — log effort entries against tasks with duration and notes
 - `rvs templates list` — list available playbook templates for the org
 - `rvs templates use` — instantiate a playbook template into a live playbook

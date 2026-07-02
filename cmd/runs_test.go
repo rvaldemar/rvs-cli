@@ -65,6 +65,27 @@ func TestReadableAPIErrorExtractsErrorMessage(t *testing.T) {
 	}
 }
 
+func TestIsTerminalRunStatus(t *testing.T) {
+	tests := []struct {
+		status   string
+		expected bool
+	}{
+		{"pending", false},
+		{"running", false},
+		{"waiting_approval", false},
+		{"waiting_fan_out", false},
+		{"done", true},
+		{"failed", true},
+		{"cancelled", true},
+		{"", false},
+	}
+	for _, test := range tests {
+		if got := isTerminalRunStatus(test.status); got != test.expected {
+			t.Fatalf("isTerminalRunStatus(%q) = %v, want %v", test.status, got, test.expected)
+		}
+	}
+}
+
 func TestConfigRedactsToken(t *testing.T) {
 	if got := redactToken("rvs_cli_abcdefghijklmnop"); got != "rvs_cli_...mnop" {
 		t.Fatalf("redactToken: got %q", got)

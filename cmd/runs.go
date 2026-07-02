@@ -93,9 +93,56 @@ var runsCancelCmd = &cobra.Command{
 	},
 }
 
+var runsWatchCmd = &cobra.Command{
+	Use:   "watch RUN_ID",
+	Short: "Watch a playbook run until terminal state",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		intervalSeconds, _ := cmd.Flags().GetInt("interval")
+		maxPolls, _ := cmd.Flags().GetInt("max-polls")
+		runID := args[0]
+		if intervalSeconds < 1 {
+			return fmt.Errorf("invalid --interval %d", intervalSeconds)
+		}
+		if maxPolls < 0 {
+			return fmt.Errorf("invalid --max-polls %d", maxPolls)
+		}
+
+		ctx := context.Background()
+		client, _, err := authenticatedClient(cmd)
+		if err != nil {
+			return err
+		}
+
+		var lastStatus string
+		poll := 0
+		for {
+			poll++
+			run, err := client.GetPlaybookRun(ctx, runID)
+			if err != nil {
+				return readableAPIError(err)
+			}
+
+			if run != nil && run.Status != lastStatus {
+				fmt.Printf("[%s] status=%s run=%s step=%s\n", time.Now().Format(time.RFC3339), run.Status, run.ID, valueOrDash(run.CurrentStepID))
+				lastStatus = run.Status
+			}
+			if run != nil && isTerminalRunStatus(run.Status) {
+				fmt.Println("Run reached terminal state:")
+				return printPlaybookRun(os.Stdout, run)
+			}
+			if maxPolls > 0 && poll >= maxPolls {
+				fmt.Printf("Stopped watching after %d polls.\n", poll)
+				return printPlaybookRun(os.Stdout, run)
+			}
+			time.Sleep(time.Duration(intervalSeconds) * time.Second)
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(runsCmd)
-	runsCmd.AddCommand(runsListCmd, runsShowCmd, runsCancelCmd)
+	runsCmd.AddCommand(runsListCmd, runsShowCmd, runsCancelCmd, runsWatchCmd)
 	for _, c := range []*cobra.Command{runsListCmd, runsShowCmd, runsCancelCmd} {
 		c.Flags().Bool("json", false, "write JSON output")
 	}
@@ -103,6 +150,8 @@ func init() {
 	runsListCmd.Flags().String("playbook-id", "", "filter by playbook id")
 	runsListCmd.Flags().String("from", "", "filter runs created after this timestamp/date")
 	runsListCmd.Flags().String("to", "", "filter runs created before this timestamp/date")
+	runsWatchCmd.Flags().Int("interval", 2, "poll interval in seconds")
+	runsWatchCmd.Flags().Int("max-polls", 0, "stop after N polls (0 = unlimited)")
 }
 
 func playbookRunFilterFromFlags(cmd *cobra.Command) (api.PlaybookRunFilter, error) {
@@ -124,6 +173,15 @@ func playbookRunFilterFromFlags(cmd *cobra.Command) (api.PlaybookRunFilter, erro
 func validRunStatus(status string) bool {
 	switch status {
 	case "pending", "running", "waiting_approval", "waiting_fan_out", "done", "failed", "cancelled":
+		return true
+	default:
+		return false
+	}
+}
+
+func isTerminalRunStatus(status string) bool {
+	switch status {
+	case "done", "failed", "cancelled":
 		return true
 	default:
 		return false

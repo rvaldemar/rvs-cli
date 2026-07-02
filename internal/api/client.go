@@ -661,6 +661,103 @@ func (f PlaybookRunFilter) query() url.Values {
 	return values
 }
 
+// === Approvals ===
+
+type ApprovalFilter struct {
+	Status string
+}
+
+type Approval struct {
+	ID            string         `json:"id"`
+	PlaybookRunID string         `json:"playbook_run_id"`
+	StepID        string         `json:"step_id"`
+	Status        string         `json:"status"`
+	RequestedVia  string         `json:"requested_via"`
+	RequestedAt   string         `json:"requested_at"`
+	DecidedBy     string         `json:"decided_by"`
+	DecidedAt     string         `json:"decided_at"`
+	DecisionNote  string         `json:"decision_note"`
+	TimeoutAt     string         `json:"timeout_at"`
+	Context       map[string]any `json:"context"`
+	CreatedAt     string         `json:"created_at"`
+}
+
+type approvalsResp struct {
+	Data []Approval `json:"data"`
+}
+
+type approvalResp struct {
+	Data Approval `json:"data"`
+}
+
+func (c *Client) ListApprovals(ctx context.Context, filter ApprovalFilter) ([]Approval, error) {
+	path := "/api/v1/approvals"
+	if query := filter.query().Encode(); query != "" {
+		path += "?" + query
+	}
+	resp, err := c.do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	out := &approvalsResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) GetApproval(ctx context.Context, id string) (*Approval, error) {
+	resp, err := c.do(ctx, "GET", "/api/v1/approvals/"+id, nil)
+	if err != nil {
+		return nil, err
+	}
+	out := &approvalResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+func (c *Client) DecideApproval(
+	ctx context.Context,
+	id string,
+	decision string,
+	decidedBy string,
+	decisionNote string,
+	effortMinutes *int,
+) (*Approval, error) {
+	payload := map[string]any{
+		"decision": decision,
+	}
+	if decidedBy != "" {
+		payload["decided_by"] = decidedBy
+	}
+	if decisionNote != "" {
+		payload["decision_note"] = decisionNote
+	}
+	if effortMinutes != nil {
+		payload["effort_minutes"] = *effortMinutes
+	}
+
+	resp, err := c.do(ctx, "POST", "/api/v1/approvals/"+id+"/decide", payload)
+	if err != nil {
+		return nil, err
+	}
+	out := &approvalResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+func (f ApprovalFilter) query() url.Values {
+	values := url.Values{}
+	if f.Status != "" {
+		values.Set("status", f.Status)
+	}
+	return values
+}
+
 // === Playbook templates ===
 
 type PlaybookTemplate struct {
