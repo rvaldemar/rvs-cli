@@ -99,8 +99,7 @@ type configStatusPayload struct {
 func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.AddCommand(configShowCmd, configPathCmd, configDoctorCmd)
-	configShowCmd.Flags().Bool("json", false, "write JSON output")
-	configDoctorCmd.Flags().Bool("json", false, "write JSON output")
+	configCmd.PersistentFlags().Bool("json", false, "write JSON output")
 }
 
 func configStatus(cmd *cobra.Command) (configStatusPayload, error) {
