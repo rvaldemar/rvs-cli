@@ -1,6 +1,6 @@
 module github.com/rvaldemar/rvs-cli
 
-go 1.23
+go 1.24
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
