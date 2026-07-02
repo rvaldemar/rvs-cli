@@ -35,7 +35,7 @@ Example:
 		note, _ := cmd.Flags().GetString("note")
 
 		ctx := context.Background()
-		client, _, err := taskClient()
+		client, _, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -69,7 +69,7 @@ Example:
 		windowDays, _ := cmd.Flags().GetInt("window")
 
 		ctx := context.Background()
-		client, _, err := taskClient()
+		client, _, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}

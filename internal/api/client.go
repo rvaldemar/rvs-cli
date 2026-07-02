@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -503,14 +504,14 @@ type EffortEntry struct {
 // EffortSummary is the aggregated thesis-status payload from
 // GET /api/v1/effort_entries/summary.
 type EffortSummary struct {
-	AtRisk             bool    `json:"at_risk"`
-	LastMilePct        float64 `json:"last_mile_pct"`
-	FirstHalfMinutes   float64 `json:"first_half_minutes"`
-	SecondHalfMinutes  float64 `json:"second_half_minutes"`
-	TotalEntries       int     `json:"total_entries"`
-	MeasuredEntries    int     `json:"measured_entries"`
-	WindowDays         int     `json:"window_days"`
-	EvaluatedAt        string  `json:"evaluated_at"`
+	AtRisk            bool    `json:"at_risk"`
+	LastMilePct       float64 `json:"last_mile_pct"`
+	FirstHalfMinutes  float64 `json:"first_half_minutes"`
+	SecondHalfMinutes float64 `json:"second_half_minutes"`
+	TotalEntries      int     `json:"total_entries"`
+	MeasuredEntries   int     `json:"measured_entries"`
+	WindowDays        int     `json:"window_days"`
+	EvaluatedAt       string  `json:"evaluated_at"`
 }
 
 func (c *Client) LogEffortEntry(ctx context.Context, minutes int, category, note string) (*EffortEntry, error) {
@@ -552,6 +553,112 @@ func (c *Client) GetEffortSummary(ctx context.Context, windowDays int) (*EffortS
 		return nil, err
 	}
 	return &out.Data, nil
+}
+
+// === Playbook runs ===
+
+type PlaybookRunFilter struct {
+	Status     string
+	PlaybookID string
+	From       string
+	To         string
+}
+
+type PlaybookRun struct {
+	ID              string         `json:"id"`
+	PlaybookID      string         `json:"playbook_id"`
+	PlaybookCode    string         `json:"playbook_code"`
+	Status          string         `json:"status"`
+	TriggeredBy     string         `json:"triggered_by"`
+	CurrentStepID   string         `json:"current_step_id"`
+	TotalCostCents  int64          `json:"total_cost_cents"`
+	StartedAt       string         `json:"started_at"`
+	FinishedAt      string         `json:"finished_at"`
+	CreatedAt       string         `json:"created_at"`
+	Inputs          map[string]any `json:"inputs,omitempty"`
+	StepResults     []StepResult   `json:"step_results,omitempty"`
+	Output          any            `json:"output,omitempty"`
+	ErrorMessage    string         `json:"error_message,omitempty"`
+	DurationSeconds float64        `json:"duration_seconds,omitempty"`
+}
+
+type StepResult struct {
+	StepID       string `json:"step_id"`
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	Status       string `json:"status"`
+	StartedAt    string `json:"started_at"`
+	FinishedAt   string `json:"finished_at"`
+	DurationMS   int64  `json:"duration_ms"`
+	CostCents    int64  `json:"cost_cents"`
+	Error        string `json:"error"`
+	ErrorMessage string `json:"error_message"`
+	Output       any    `json:"output"`
+}
+
+type playbookRunsResp struct {
+	Data []PlaybookRun `json:"data"`
+}
+
+type playbookRunResp struct {
+	Data PlaybookRun `json:"data"`
+}
+
+func (c *Client) ListPlaybookRuns(ctx context.Context, filter PlaybookRunFilter) ([]PlaybookRun, error) {
+	path := "/api/v1/playbook_runs"
+	if query := filter.query().Encode(); query != "" {
+		path += "?" + query
+	}
+	resp, err := c.do(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	out := &playbookRunsResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+func (c *Client) GetPlaybookRun(ctx context.Context, id string) (*PlaybookRun, error) {
+	resp, err := c.do(ctx, "GET", "/api/v1/playbook_runs/"+id, nil)
+	if err != nil {
+		return nil, err
+	}
+	out := &playbookRunResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+func (c *Client) CancelPlaybookRun(ctx context.Context, id string) (*PlaybookRun, error) {
+	resp, err := c.do(ctx, "POST", "/api/v1/playbook_runs/"+id+"/cancel", nil)
+	if err != nil {
+		return nil, err
+	}
+	out := &playbookRunResp{}
+	if err := c.decode(resp, out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+func (f PlaybookRunFilter) query() url.Values {
+	values := url.Values{}
+	if f.Status != "" {
+		values.Set("status", f.Status)
+	}
+	if f.PlaybookID != "" {
+		values.Set("playbook_id", f.PlaybookID)
+	}
+	if f.From != "" {
+		values.Set("created_after", f.From)
+	}
+	if f.To != "" {
+		values.Set("created_before", f.To)
+	}
+	return values
 }
 
 // === Playbook templates ===

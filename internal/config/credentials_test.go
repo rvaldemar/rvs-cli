@@ -55,6 +55,48 @@ func TestLoadMissingReturnsDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadUsesEnvironmentTokenWithoutCredentialsFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("RVS_CONFIG_DIR", dir)
+	t.Setenv("RVS_TOKEN", "env-token")
+
+	out, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if out.Token != "env-token" {
+		t.Errorf("token: got %q", out.Token)
+	}
+	if out.TokenSource != "RVS_TOKEN" {
+		t.Errorf("token source: got %q", out.TokenSource)
+	}
+	if out.APIBase != DefaultAPIBase {
+		t.Errorf("api base: got %q", out.APIBase)
+	}
+}
+
+func TestLoadEnvironmentOverridesCredentialsFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("RVS_CONFIG_DIR", dir)
+
+	if err := Save(Credentials{APIBase: "https://file.example", Token: "file-token"}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	t.Setenv("RVS_TOKEN", "env-token")
+	t.Setenv("RVS_API_BASE", "https://env.example")
+
+	out, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if out.Token != "env-token" || out.TokenSource != "RVS_TOKEN" {
+		t.Errorf("token override mismatch: %+v", out)
+	}
+	if out.APIBase != "https://env.example" || out.APIBaseSource != "RVS_API_BASE" {
+		t.Errorf("api override mismatch: %+v", out)
+	}
+}
+
 func TestClear(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("RVS_CONFIG_DIR", dir)

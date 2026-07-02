@@ -35,7 +35,7 @@ var taskListCmd = &cobra.Command{
 	Short: "List recent agent tasks",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		client, _, err := taskClient()
+		client, _, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ var taskShowCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		client, _, err := taskClient()
+		client, _, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ var taskCreateCmd = &cobra.Command{
 	Short: "Create an agent task contract",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		client, _, err := taskClient()
+		client, _, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ var taskClaimCmd = &cobra.Command{
 	Short: "Claim the next agent task",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		client, creds, err := taskClient()
+		client, creds, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -173,7 +173,7 @@ var taskRunCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		client, creds, err := taskClient()
+		client, creds, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -228,7 +228,7 @@ var taskSubmitCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		client, creds, err := taskClient()
+		client, creds, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -255,7 +255,7 @@ var taskFailCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		client, creds, err := taskClient()
+		client, creds, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -286,7 +286,7 @@ var taskCancelCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		client, _, err := taskClient()
+		client, _, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -337,18 +337,8 @@ func init() {
 	taskFailCmd.Flags().String("artifact", "", "JSON artifact file")
 }
 
-func taskClient() (*api.Client, config.Credentials, error) {
-	creds, err := config.Load()
-	if err != nil {
-		return nil, creds, err
-	}
-	if creds.Empty() {
-		return nil, creds, errors.New("not logged in. Run: rvs login")
-	}
-	if creds.APIBase == "" {
-		creds.APIBase = config.DefaultAPIBase
-	}
-	return api.New(creds.APIBase, creds.Token), creds, nil
+func taskClient(cmd *cobra.Command) (*api.Client, config.Credentials, error) {
+	return authenticatedClient(cmd)
 }
 
 func taskJSONFlag(cmd *cobra.Command) bool {

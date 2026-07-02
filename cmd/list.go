@@ -2,13 +2,10 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"text/tabwriter"
 
-	"github.com/rvaldemar/rvs-cli/internal/api"
-	"github.com/rvaldemar/rvs-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -19,14 +16,10 @@ var listCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		creds, err := config.Load()
+		c, _, err := authenticatedClient(cmd)
 		if err != nil {
 			return err
 		}
-		if creds.Empty() {
-			return errors.New("not logged in. Run: rvs login")
-		}
-		c := api.New(creds.APIBase, creds.Token)
 		convs, err := c.ListConversations(ctx)
 		if err != nil {
 			return err
@@ -53,14 +46,10 @@ var meCmd = &cobra.Command{
 	Short: "Show the current session identity and quota",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		creds, err := config.Load()
+		c, _, err := authenticatedClient(cmd)
 		if err != nil {
 			return err
 		}
-		if creds.Empty() {
-			return errors.New("not logged in. Run: rvs login")
-		}
-		c := api.New(creds.APIBase, creds.Token)
 		me, err := c.Me(ctx)
 		if err != nil {
 			return err
@@ -106,14 +95,10 @@ var modelsCmd = &cobra.Command{
 	Short: "List models available to your org",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		creds, err := config.Load()
+		c, _, err := authenticatedClient(cmd)
 		if err != nil {
 			return err
 		}
-		if creds.Empty() {
-			return errors.New("not logged in. Run: rvs login")
-		}
-		c := api.New(creds.APIBase, creds.Token)
 		models, err := c.Models(ctx)
 		if err != nil {
 			return err

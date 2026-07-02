@@ -27,7 +27,7 @@ Example:
 		domain, _ := cmd.Flags().GetString("domain")
 
 		ctx := context.Background()
-		client, _, err := taskClient()
+		client, _, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -72,7 +72,7 @@ Example:
 		code, _ := cmd.Flags().GetString("code")
 
 		ctx := context.Background()
-		client, _, err := taskClient()
+		client, _, err := taskClient(cmd)
 		if err != nil {
 			return err
 		}

@@ -7,6 +7,9 @@
 //	token=<bearer token>
 //	user_email=alice@example.com
 //	org_slug=acme
+//
+// Environment overrides are intentionally supported for CI and agent runners:
+// RVS_TOKEN overrides token, and RVS_API_BASE / RVS_API override api.
 package config
 
 import (
@@ -21,10 +24,12 @@ import (
 const DefaultAPIBase = "https://agents.rvs.solutions"
 
 type Credentials struct {
-	APIBase   string
-	Token     string
-	UserEmail string
-	OrgSlug   string
+	APIBase       string
+	Token         string
+	UserEmail     string
+	OrgSlug       string
+	APIBaseSource string
+	TokenSource   string
 }
 
 func (c Credentials) Empty() bool {
@@ -42,21 +47,27 @@ func path() (string, error) {
 	return filepath.Join(dir, "rvs", "credentials"), nil
 }
 
+func Path() (string, error) {
+	return path()
+}
+
 func Load() (Credentials, error) {
 	p, err := path()
 	if err != nil {
 		return Credentials{}, err
 	}
+
+	c := Credentials{APIBase: DefaultAPIBase, APIBaseSource: "default"}
 	f, err := os.Open(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return Credentials{APIBase: DefaultAPIBase}, nil
+			applyEnvOverrides(&c)
+			return c, nil
 		}
 		return Credentials{}, err
 	}
 	defer f.Close()
 
-	c := Credentials{APIBase: DefaultAPIBase}
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -69,9 +80,15 @@ func Load() (Credentials, error) {
 		}
 		switch strings.TrimSpace(k) {
 		case "api":
-			c.APIBase = strings.TrimSpace(v)
+			if value := strings.TrimSpace(v); value != "" {
+				c.APIBase = value
+				c.APIBaseSource = "file"
+			}
 		case "token":
-			c.Token = strings.TrimSpace(v)
+			if value := strings.TrimSpace(v); value != "" {
+				c.Token = value
+				c.TokenSource = "file"
+			}
 		case "user_email":
 			c.UserEmail = strings.TrimSpace(v)
 		case "org_slug":
@@ -83,8 +100,25 @@ func Load() (Credentials, error) {
 	}
 	if c.APIBase == "" {
 		c.APIBase = DefaultAPIBase
+		c.APIBaseSource = "default"
 	}
+	applyEnvOverrides(&c)
 	return c, nil
+}
+
+func applyEnvOverrides(c *Credentials) {
+	if api := strings.TrimSpace(os.Getenv("RVS_API_BASE")); api != "" {
+		c.APIBase = api
+		c.APIBaseSource = "RVS_API_BASE"
+	} else if api := strings.TrimSpace(os.Getenv("RVS_API")); api != "" {
+		c.APIBase = api
+		c.APIBaseSource = "RVS_API"
+	}
+
+	if token := strings.TrimSpace(os.Getenv("RVS_TOKEN")); token != "" {
+		c.Token = token
+		c.TokenSource = "RVS_TOKEN"
+	}
 }
 
 func Save(c Credentials) error {

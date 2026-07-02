@@ -6,10 +6,10 @@
 //
 // Wire path:
 //
-//   rvs code  ─WS─►  Hub /cable (CodeBridgeChannel) ─gRPC─►  rvs-openclaude
-//                                                              QueryEngine
-//                                                              ↓
-//                                                              provider
+//	rvs code  ─WS─►  Hub /cable (CodeBridgeChannel) ─gRPC─►  rvs-openclaude
+//	                                                           QueryEngine
+//	                                                           ↓
+//	                                                           provider
 //
 // All traffic is proto3-JSON-encoded openclaude.ClientMessage / ServerMessage
 // wrapped in ActionCable frames.
@@ -29,7 +29,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rvaldemar/rvs-cli/internal/bridge"
-	"github.com/rvaldemar/rvs-cli/internal/config"
 	openclaudev1 "github.com/rvaldemar/rvs-cli/internal/openclaude/v1"
 	"github.com/rvaldemar/rvs-cli/internal/tools"
 )
@@ -61,15 +60,9 @@ func init() {
 }
 
 func runCode(cmd *cobra.Command, args []string) error {
-	creds, err := config.Load()
+	_, creds, err := authenticatedClient(cmd)
 	if err != nil {
-		return fmt.Errorf("read credentials: %w", err)
-	}
-	if creds.Empty() {
-		return errors.New("not logged in. Run: rvs login")
-	}
-	if creds.APIBase == "" {
-		creds.APIBase = config.DefaultAPIBase
+		return err
 	}
 
 	prompt, err := resolvePrompt(args)
@@ -142,10 +135,10 @@ func runCode(cmd *cobra.Command, args []string) error {
 
 func runEventLoop(ctx context.Context, client *bridge.Client, runner *tools.Runner, printOnly bool) error {
 	var (
-		finalText      strings.Builder
-		exitErr        error
-		cancelSent     bool
-		stop           = ctx.Done()
+		finalText  strings.Builder
+		exitErr    error
+		cancelSent bool
+		stop       = ctx.Done()
 	)
 
 	flushFinal := func() {
@@ -362,4 +355,3 @@ func readYesNo() bool {
 	r := strings.ToLower(strings.TrimSpace(string(buf[:n])))
 	return r == "y" || r == "yes"
 }
-

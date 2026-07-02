@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"context"
-	"errors"
 
 	"github.com/rvaldemar/rvs-cli/internal/api"
 	"github.com/rvaldemar/rvs-cli/internal/chat"
-	"github.com/rvaldemar/rvs-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -21,14 +19,10 @@ is created. Use /help once inside to see the slash commands.`,
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		creds, err := config.Load()
+		client, creds, err := authenticatedClient(cmd)
 		if err != nil {
 			return err
 		}
-		if creds.Empty() {
-			return errors.New("not logged in. Run: rvs login")
-		}
-		client := api.New(creds.APIBase, creds.Token)
 		session := chat.New(client, creds.APIBase, creds.UserEmail)
 		if len(args) == 1 {
 			session.Conv = &api.Conversation{ID: args[0]}

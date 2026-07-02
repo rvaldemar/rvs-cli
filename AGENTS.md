@@ -18,3 +18,10 @@ Tool adapters:
 - Apply product, technical, security/data, operations, cost, UX, tests, diff, and release gates proportional to risk.
 - Do not read or expose secret values. Use existing environment secrets blindly when needed.
 - Work silently by default. Report concise results, validations, risks, blockers, and next actions.
+
+## CLI Usage Notes
+
+- Prefer `RVS_TOKEN` for agent/CI auth and `RVS_API_BASE` for non-production Hub targets.
+- Use `rvs config show` before debugging auth; it redacts tokens and shows the active config source.
+- Use `--json` on automation-facing commands (`task`, `runs`, `config doctor`) when scripting.
+- For local task execution, use the claim/run loop: `rvs task claim` then `rvs task run <task-id>`.

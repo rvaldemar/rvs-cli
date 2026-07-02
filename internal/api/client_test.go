@@ -264,3 +264,88 @@ func TestClaimAgentTaskEmptyQueue(t *testing.T) {
 		t.Fatalf("expected nil task, got %+v", task)
 	}
 }
+
+func TestPlaybookRunsListShowCancel(t *testing.T) {
+	var seen []string
+	_, c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Method+" "+r.URL.RequestURI())
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/playbook_runs":
+			if got := r.URL.Query().Get("status"); got != "running" {
+				t.Errorf("status query: got %q", got)
+			}
+			if got := r.URL.Query().Get("created_after"); got != "2026-07-01" {
+				t.Errorf("created_after query: got %q", got)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{{
+					"id":              "run-1",
+					"playbook_code":   "S01",
+					"status":          "running",
+					"current_step_id": "extract",
+				}},
+			})
+		case "/api/v1/playbook_runs/run-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
+					"id":              "run-1",
+					"playbook_code":   "S01",
+					"status":          "running",
+					"current_step_id": "extract",
+					"step_results": []map[string]any{{
+						"step_id":     "extract",
+						"status":      "done",
+						"duration_ms": 120,
+						"cost_cents":  1,
+					}},
+				},
+			})
+		case "/api/v1/playbook_runs/run-1/cancel":
+			if r.Method != http.MethodPost {
+				t.Errorf("method: %s", r.Method)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
+					"id":     "run-1",
+					"status": "cancelled",
+				},
+			})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	runs, err := c.ListPlaybookRuns(context.Background(), PlaybookRunFilter{Status: "running", From: "2026-07-01"})
+	if err != nil {
+		t.Fatalf("ListPlaybookRuns: %v", err)
+	}
+	if len(runs) != 1 || runs[0].ID != "run-1" || runs[0].CurrentStepID != "extract" {
+		t.Fatalf("runs: %+v", runs)
+	}
+
+	run, err := c.GetPlaybookRun(context.Background(), "run-1")
+	if err != nil {
+		t.Fatalf("GetPlaybookRun: %v", err)
+	}
+	if len(run.StepResults) != 1 || run.StepResults[0].DurationMS != 120 {
+		t.Fatalf("run detail: %+v", run)
+	}
+
+	cancelled, err := c.CancelPlaybookRun(context.Background(), "run-1")
+	if err != nil {
+		t.Fatalf("CancelPlaybookRun: %v", err)
+	}
+	if cancelled.Status != "cancelled" {
+		t.Fatalf("cancelled: %+v", cancelled)
+	}
+
+	want := []string{
+		"GET /api/v1/playbook_runs?created_after=2026-07-01&status=running",
+		"GET /api/v1/playbook_runs/run-1",
+		"POST /api/v1/playbook_runs/run-1/cancel",
+	}
+	if strings.Join(seen, ",") != strings.Join(want, ",") {
+		t.Fatalf("seen %v want %v", seen, want)
+	}
+}

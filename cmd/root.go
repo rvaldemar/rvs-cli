@@ -25,7 +25,9 @@ Streaming, attachments, exports, and the same quota as the web app.
 
 Get started:
   rvs login         issue a CLI token (or paste an existing one)
+  rvs config show   inspect the effective API/token configuration
   rvs chat          interactive REPL with your agents
+  rvs runs list     observe playbook execution from the terminal
   rvs code          agentic coding loop (laptop tools + Hub-hosted LLM)
   rvs version       print the binary version`,
 }

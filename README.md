@@ -5,6 +5,7 @@ Terminal client for the [RVS Agents Hub](https://hub.rvs.solutions).
 ```sh
 curl -fsSL https://hub.rvs.solutions/cli/install.sh | sh
 rvs login
+rvs config show      # inspect effective API/token configuration
 rvs chat              # conversational REPL (HTTP/SSE against the Hub)
 rvs code              # agentic coding with laptop-local tools, brokered by the Hub
 rvs task list         # Hub-issued CoS/agent tasks
@@ -12,7 +13,6 @@ rvs effort log        # log effort entries (time tracking)
 rvs templates list    # list available playbook templates
 rvs templates use     # instantiate a playbook template
 rvs runs list         # list playbook runs for the org
-rvs approvals list    # list pending approval requests
 ```
 
 ## Authentication
@@ -37,10 +37,26 @@ export RVS_TOKEN=rvs_cli_xxxxxxxxxxxx
 rvs chat
 ```
 
+Set `RVS_API_BASE` when targeting staging or a local Hub:
+
+```sh
+export RVS_API_BASE=http://localhost:3000
+rvs config show
+```
+
+For a one-off override, every command also accepts `--api`:
+
+```sh
+rvs --api http://localhost:3000 config doctor
+```
+
 To generate a token: **Hub UI → Settings → CLI Tokens**
 (`https://hub.rvs.solutions/settings/cli_tokens`).
 Tokens are scoped per org and per user. Treat them like passwords — do not
 commit them to source control.
+
+Use `rvs config show` to confirm which API URL and token source are active.
+The command always redacts the token value.
 
 ## Commands
 
@@ -48,18 +64,22 @@ commit them to source control.
 |---|---|
 | `rvs login` | Authenticate (browser OAuth or `$RVS_TOKEN`) |
 | `rvs logout` | Remove stored credentials |
+| `rvs config show` | Show effective API URL, token source, user/org hints, and credentials path |
+| `rvs config path` | Print the credentials file path |
+| `rvs config doctor` | Verify the effective token against the Hub |
 | `rvs me` | Print the current authenticated user |
 | `rvs chat` | Interactive chat REPL (HTTP/SSE) |
 | `rvs code` | Agentic coding loop (WebSocket bridge, local tool executors) |
-| `rvs list` | List agent tasks |
+| `rvs list` | List recent conversations |
 | `rvs task create` | Create a CoS agent task |
 | `rvs task claim` | Claim the next available task |
 | `rvs task run <id>` | Execute a claimed task and submit the artifact |
 | `rvs effort log` | Log effort entries against tasks |
 | `rvs templates list` | List available playbook templates |
 | `rvs templates use` | Instantiate a playbook template into a live playbook |
-| `rvs runs list` | List playbook runs for the org |
-| `rvs approvals list` | List pending approval requests |
+| `rvs runs list` | List playbook runs for the org; supports `--status`, `--from`, `--to`, `--json` |
+| `rvs runs show <id>` | Inspect one playbook run with step results |
+| `rvs runs cancel <id>` | Cancel a running or waiting playbook run |
 | `rvs models` | List available LLM models |
 | `rvs version` | Print CLI version |
 | `rvs completion` | Generate shell completion scripts |
