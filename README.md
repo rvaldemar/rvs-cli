@@ -5,7 +5,7 @@ Terminal client for the [RVS Agents Hub](https://hub.rvs.solutions).
 ```sh
 curl -fsSL https://hub.rvs.solutions/cli/install.sh | sh
 rvs login
-rvs config show      # inspect effective API/token configuration
+rvs config           # inspect effective API/token configuration
 rvs chat              # conversational REPL (HTTP/SSE against the Hub)
 rvs code              # agentic coding with laptop-local tools, brokered by the Hub
 rvs task list         # Hub-issued CoS/agent tasks
@@ -66,7 +66,7 @@ The command always redacts the token value.
 |---|---|
 | `rvs login` | Authenticate (browser OAuth or `$RVS_TOKEN`) |
 | `rvs logout` | Remove stored credentials |
-| `rvs config show` | Show effective API URL, token source, user/org hints, and credentials path |
+| `rvs config` (or `rvs config show`) | Show effective API URL, token source, user/org hints, and credentials path |
 | `rvs config path` | Print the credentials file path |
 | `rvs config doctor` | Verify the effective token against the Hub |
 | `rvs me` | Print the current authenticated user |

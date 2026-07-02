@@ -1,5 +1,20 @@
 # rvs CLI — Release Notes
 
+## v0.3.3 (local release prep)
+
+Added
+- `rvs config` now defaults to printing the current CLI configuration, so
+  `rvs config` and `rvs config show` behave the same.
+- New config status UX with explicit setup guidance when no token is configured
+  (warnings + suggested next action).
+
+Fixed
+- Made config status output more readable by grouping runtime config and auth details
+  and by surfacing empty-token guidance directly in CLI output.
+
+Testing
+- Added command-level tests for config status rendering and warning behavior.
+
 ## v0.3.0 (unreleased — prepared, not yet tagged/published)
 
 Changes since v0.2.0 (`496faf8`):

@@ -15,6 +15,19 @@ import (
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Inspect CLI configuration and authentication",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 {
+			return cmd.Help()
+		}
+		status, err := configStatus(cmd)
+		if err != nil {
+			return err
+		}
+		if taskJSONFlag(cmd) {
+			return printJSON(status)
+		}
+		return printConfigStatus(os.Stdout, status)
+	},
 }
 
 var configShowCmd = &cobra.Command{
@@ -71,14 +84,16 @@ var configDoctorCmd = &cobra.Command{
 }
 
 type configStatusPayload struct {
-	APIBase       string `json:"api_base"`
-	APIBaseSource string `json:"api_base_source"`
-	Token         string `json:"token"`
-	TokenSource   string `json:"token_source"`
-	LoggedIn      bool   `json:"logged_in"`
-	UserEmail     string `json:"user_email,omitempty"`
-	OrgSlug       string `json:"org_slug,omitempty"`
-	Credentials   string `json:"credentials_path"`
+	APIBase       string   `json:"api_base"`
+	APIBaseSource string   `json:"api_base_source"`
+	Token         string   `json:"token"`
+	TokenSource   string   `json:"token_source"`
+	LoggedIn      bool     `json:"logged_in"`
+	Ready         bool     `json:"ready"`
+	UserEmail     string   `json:"user_email,omitempty"`
+	OrgSlug       string   `json:"org_slug,omitempty"`
+	Credentials   string   `json:"credentials_path"`
+	Warnings      []string `json:"warnings,omitempty"`
 }
 
 func init() {
@@ -111,27 +126,54 @@ func configStatus(cmd *cobra.Command) (configStatusPayload, error) {
 		Token:         redactToken(creds.Token),
 		TokenSource:   tokenSource,
 		LoggedIn:      !creds.Empty(),
+		Ready:         !creds.Empty(),
 		UserEmail:     creds.UserEmail,
 		OrgSlug:       creds.OrgSlug,
 		Credentials:   p,
+		Warnings:      configWarnings(creds),
 	}, nil
 }
 
 func printConfigStatus(w io.Writer, status configStatusPayload) error {
+	fmt.Fprintln(w, "CLI configuration")
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	fmt.Fprintf(tw, "API\t%s\n", status.APIBase)
-	fmt.Fprintf(tw, "API source\t%s\n", status.APIBaseSource)
-	fmt.Fprintf(tw, "Token\t%s\n", status.Token)
-	fmt.Fprintf(tw, "Token source\t%s\n", status.TokenSource)
-	fmt.Fprintf(tw, "Logged in\t%t\n", status.LoggedIn)
+	fmt.Fprintf(tw, "  API\t%s (%s)\n", status.APIBase, status.APIBaseSource)
+	fmt.Fprintf(tw, "  Token\t%s (%s)\n", status.Token, status.TokenSource)
+	fmt.Fprintf(tw, "  Logged in\t%t\n", status.LoggedIn)
+	fmt.Fprintf(tw, "  Credentials\t%s\n", status.Credentials)
 	if status.UserEmail != "" {
-		fmt.Fprintf(tw, "User\t%s\n", status.UserEmail)
+		fmt.Fprintf(tw, "  User\t%s\n", status.UserEmail)
 	}
 	if status.OrgSlug != "" {
-		fmt.Fprintf(tw, "Org\t%s\n", status.OrgSlug)
+		fmt.Fprintf(tw, "  Org\t%s\n", status.OrgSlug)
 	}
-	fmt.Fprintf(tw, "Credentials\t%s\n", status.Credentials)
-	return tw.Flush()
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+
+	fmt.Fprintln(w, "")
+	if len(status.Warnings) == 0 {
+		fmt.Fprintln(w, "Status: ready")
+		return nil
+	}
+
+	fmt.Fprintln(w, "Status: needs setup")
+	fmt.Fprintln(w, "Actions:")
+	for _, warning := range status.Warnings {
+		fmt.Fprintf(w, "  - %s\n", warning)
+	}
+	return nil
+}
+
+func configWarnings(creds config.Credentials) []string {
+	var warnings []string
+	if creds.Empty() {
+		warnings = append(warnings, "No token configured. Run `rvs login` or set `RVS_TOKEN`.")
+	}
+	if creds.APIBase == "" {
+		warnings = append(warnings, "API base is empty. Set --api or `RVS_API_BASE`.")
+	}
+	return warnings
 }
 
 func redactToken(token string) string {
