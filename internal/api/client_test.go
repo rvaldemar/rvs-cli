@@ -411,7 +411,7 @@ func TestApprovalsListShowDecide(t *testing.T) {
 		}
 	})
 
-	approvals, err := c.ListApprovals(context.Background(), api.ApprovalFilter{Status: "pending"})
+	approvals, err := c.ListApprovals(context.Background(), ApprovalFilter{Status: "pending"})
 	if err != nil {
 		t.Fatalf("ListApprovals: %v", err)
 	}
