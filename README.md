@@ -77,6 +77,7 @@ The command always redacts the token value.
 | `rvs task claim` | Claim the next available task |
 | `rvs task run <id>` | Execute a claimed task and submit the artifact |
 | `rvs effort log` | Log effort entries against tasks |
+| `rvs effort summary` | Show aggregated effort totals and thesis-risk status |
 | `rvs templates list` | List available playbook templates |
 | `rvs templates use` | Instantiate a playbook template into a live playbook |
 | `rvs approvals list` | List approvals (`--status` supports pending/approved/rejected/expired) |
